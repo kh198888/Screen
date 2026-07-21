@@ -36,7 +36,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
 # Run server
-CMD ["python", "-m", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "server.main"]
 
 # Stage 2: Client (Windows-specific, for reference)
 # Note: This stage is for Linux clients only. Windows clients should run natively.

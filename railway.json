@@ -1,7 +1,8 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "DOCKER",
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
     "startCommand": "python -c \"import os,sys; from pathlib import Path;\nexclude={'proc','sys','dev','run','tmp','.git','node_modules','venv','env','.venv'};\ndef find(root):\n for r,d,f in os.walk(root):\n  if 'server' in d and os.path.isfile(os.path.join(r,'server','main.py')):\n   return r\n  d[:] = [x for x in d if x not in exclude]\n return None\npaths=[Path.cwd(),Path('/app'),Path('/workspace'),Path('/var/task'),Path('/usr/src/app'),Path('/opt'),Path('/home'),Path('/mnt')];\nroot=None\nfor p in paths:\n if p.exists():\n  root=find(str(p))\n  if root: break\nif root is None: sys.exit('Could not locate server package');\nprint('FOUND', root, file=sys.stderr);\nsys.path.insert(0, root);\nfrom server.main import main;\nmain()\"",
