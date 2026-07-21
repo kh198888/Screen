@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Desktop Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        .computer-card {
+            transition: all 0.2s ease;
+        }
+        
+        .computer-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .computer-card.active {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+        }
+        
+        .status-online {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .screen-container {
+            background: repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 20px 20px;
+        }
+        
+        .keyboard-event {
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Left Panel - Computer List -->
+        <div class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col">
+            <!-- Header -->
+            <div class="p-4 border-b border-slate-800">
+                <h1 class="text-xl font-bold text-blue-400 mb-3">Remote Monitor</h1>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="searchInput"
+                        placeholder="Search computers..." 
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    >
+                    <svg class="absolute right-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Computer List -->
+            <div id="computerList" class="flex-1 overflow-y-auto p-3 space-y-2">
+                <!-- Computers will be loaded here -->
+                <div class="text-center text-slate-500 py-8">
+                    <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    <p>Loading computers...</p>
+                </div>
+            </div>
+            
+            <!-- Stats Footer -->
+            <div class="p-4 border-t border-slate-800 bg-slate-900/50">
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-800 rounded-lg p-2 text-center">
+                        <div id="totalComputers" class="text-lg font-bold text-blue-400">0</div>
+                        <div class="text-slate-400">Total</div>
+                    </div>
+                    <div class="bg-slate-800 rounded-lg p-2 text-center">
+                        <div id="onlineComputers" class="text-lg font-bold text-green-400">0</div>
+                        <div class="text-slate-400">Online</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Bar -->
+            <div class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <span id="selectedComputerName" class="text-slate-400 text-sm">Select a computer</span>
+                    <span id="connectionStatus" class="hidden">
+                        <span class="w-2 h-2 bg-green-500 rounded-full status-online inline-block"></span>
+                        <span class="text-green-400 text-xs ml-1">Live</span>
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Center - Screen Monitor -->
+            <div class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+                <!-- Toolbar -->
+                <div id="toolbar" class="hidden bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <button 
+                            id="fullscreenBtn"
+                            class="flex items-center space-x-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
+                            <span>Fullscreen</span>
+                        </button>
+                        <button 
+                            id="pauseBtn"
+                            class="flex items-center space-x-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Pause</span>
+                        </button>
+                        <button 
+                            id="resumeBtn"
+                            class="hidden flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Resume</span>
+                        </button>
+                        <button 
+                            id="stopBtn"
+                            class="flex items-center space-x-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-sm transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                            </svg>
+                            <span>Stop</span>
+                        </button>
+                    </div>
+                    <div id="recursiveWarning" class="hidden flex items-center space-x-2 px-3 py-1.5 bg-yellow-900/50 border border-yellow-600 rounded-lg">
+                        <svg class="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <span class="text-xs text-yellow-500">Viewing the same monitored computer may create an infinite mirror effect</span>
+                    </div>
+                </div>
+                
+                <!-- Screen Container -->
+                <div id="screenContainer" class="flex-1 relative flex items-center justify-center overflow-hidden bg-[#111827]" style="width: 100%; height: 100%;">
+                    <div id="screenPlaceholder" class="text-center">
+                        <svg class="w-24 h-24 mx-auto mb-4 text-slate-600 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <p class="text-slate-500">Select a computer to view screen</p>
+                    </div>
+                    <div id="noDataMessage" class="hidden text-center">
+                        <svg class="w-24 h-24 mx-auto mb-4 text-red-500 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <p class="text-red-400">No screen data received</p>
+                    </div>
+                    <canvas 
+                        id="screenCanvas" 
+                        class="hidden"
+                        style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                    ></canvas>
+                    <div id="debugInfo" class="absolute top-2 right-2 bg-black/80 rounded-lg p-2 text-xs hidden"></div>
+                </div>
+                
+                <!-- Stats Bar -->
+                <div id="statsBar" class="hidden bg-slate-900 border-t border-slate-800 px-6 py-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <div class="flex items-center space-x-6">
+                            <div>
+                                <span class="text-slate-400">Resolution:</span>
+                                <span id="statResolution" class="text-slate-200 ml-1">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">FPS:</span>
+                                <span id="statFPS" class="text-slate-200 ml-1">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">CPU:</span>
+                                <span id="statCPU" class="text-slate-200 ml-1">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">Memory:</span>
+                                <span id="statMemory" class="text-slate-200 ml-1">-</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-slate-400">Connection:</span>
+                            <span id="statConnection" class="text-green-400 ml-1">Good</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+                <!-- Bottom - Keyboard Input -->
+            <div class="h-64 bg-slate-900 border-t border-slate-800 flex flex-col">
+                <div class="px-6 py-2 border-b border-slate-800 flex items-center justify-between">
+                    <h3 class="text-sm font-medium text-slate-300">Typed Input</h3>
+                    <div class="flex items-center space-x-2">
+                        <input 
+                            type="text" 
+                            id="keyboardSearch"
+                            placeholder="Filter input..." 
+                            class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs w-40 focus:outline-none focus:border-blue-500"
+                        >
+                        <select 
+                            id="windowFilter"
+                            class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                        >
+                            <option value="">All Windows</option>
+                        </select>
+                        <button 
+                            id="copyAllBtn"
+                            class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs transition-colors"
+                        >
+                            Copy All
+                        </button>
+                        <button 
+                            id="clearBtn"
+                            class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs transition-colors"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                <div 
+                    id="keyboardEvents"
+                    class="flex-1 overflow-y-auto p-4 font-mono text-sm text-slate-100 whitespace-pre-wrap break-words leading-6"
+                >
+                    <div class="text-center text-slate-500 py-4">
+                        Typed input will appear here
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let selectedComputerId = null;
+        let selectedComputer = null;
+        let ws = null;
+        let isPaused = false;
+        let keyboardEvents = [];
+        let authToken = localStorage.getItem('authToken') || 'demo-token';
+        
+        // Frame rendering state
+        let frameBuffer = null;
+        let lastFrameTimestamp = 0;
+        let frameCount = 0;
+        let fps = 0;
+        let lastFpsUpdate = 0;
+        let isRendering = false;
+        let canvas = null;
+        let ctx = null;
+        let offscreenCanvas = null;
+        let offscreenCtx = null;
+        
+        // Debug information
+        let debugInfo = {
+            incomingFPS: 0,
+            outgoingFPS: 0,
+            imageSize: 0,
+            resolution: '0x0',
+            bytesPerFrame: 0,
+            droppedFrames: 0,
+            lastFrameTime: 0
+        };
+        let lastFrameReceivedTime = 0;
+        
+        // Recursive detection
+        let isRecursiveCapture = false;
+        
+        // DOM Elements
+        const computerList = document.getElementById('computerList');
+        const searchInput = document.getElementById('searchInput');
+        const screenContainer = document.getElementById('screenContainer');
+        const screenCanvas = document.getElementById('screenCanvas');
+        const screenPlaceholder = document.getElementById('screenPlaceholder');
+        const recursiveWarning = document.getElementById('recursiveWarning');
+        const keyboardEventsContainer = document.getElementById('keyboardEvents');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const selectedComputerName = document.getElementById('selectedComputerName');
+        const statsBar = document.getElementById('statsBar');
+        
+        // Stats elements
+        const statResolution = document.getElementById('statResolution');
+        const statFPS = document.getElementById('statFPS');
+        const statCPU = document.getElementById('statCPU');
+        const statMemory = document.getElementById('statMemory');
+        const statConnection = document.getElementById('statConnection');
+        
+        // Buttons
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const copyAllBtn = document.getElementById('copyAllBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const keyboardSearch = document.getElementById('keyboardSearch');
+        const windowFilter = document.getElementById('windowFilter');
+        
+        // Initialize canvas
+        function initCanvas() {
+            canvas = screenCanvas;
+            ctx = canvas.getContext('2d', { alpha: false });
+            
+            // Try to use OffscreenCanvas for better performance
+            if (typeof OffscreenCanvas !== 'undefined') {
+                try {
+                    offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
+                    offscreenCtx = offscreenCanvas.getContext('2d', { alpha: false });
+                } catch (e) {
+                    console.log('OffscreenCanvas not available');
+                }
+            }
+        }
+        
+        // Initialize
+        async function init() {
+            initCanvas();
+            await loadComputers();
+            connectWebSocket();
+            
+            // Setup button handlers
+            setupButtonHandlers();
+            
+            // Refresh computer list every 5 seconds
+            setInterval(loadComputers, 5000);
+            
+            // Start rendering loop
+            requestAnimationFrame(renderLoop);
+        }
+        
+        // Setup button handlers
+        function setupButtonHandlers() {
+            // Fullscreen
+            fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    screenContainer.requestFullscreen().catch(err => {
+                        console.error('Fullscreen error:', err);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+            
+            // Pause
+            pauseBtn.addEventListener('click', () => {
+                isPaused = true;
+                pauseBtn.classList.add('hidden');
+                resumeBtn.classList.remove('hidden');
+            });
+            
+            // Resume
+            resumeBtn.addEventListener('click', () => {
+                isPaused = false;
+                resumeBtn.classList.add('hidden');
+                pauseBtn.classList.remove('hidden');
+            });
+            
+            // Stop
+            stopBtn.addEventListener('click', () => {
+                selectedComputerId = null;
+                selectedComputer = null;
+                screenCanvas.classList.add('hidden');
+                screenPlaceholder.classList.remove('hidden');
+                document.getElementById('toolbar').classList.add('hidden');
+                document.getElementById('statsBar').classList.add('hidden');
+                recursiveWarning.classList.add('hidden');
+                loadComputers();
+            });
+        }
+        
+        // Rendering loop with requestAnimationFrame
+        function renderLoop(timestamp) {
+            if (!isPaused && frameBuffer && selectedComputerId) {
+                renderFrame(frameBuffer);
+                frameBuffer = null;
+            }
+            
+            // Calculate FPS
+            frameCount++;
+            if (timestamp - lastFpsUpdate >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastFpsUpdate = timestamp;
+                updateStatsDisplay();
+                updateDebugDisplay();
+            }
+            
+            // Check for no data received
+            if (selectedComputerId && lastFrameReceivedTime && (Date.now() - lastFrameReceivedTime > 2000)) {
+                showNoDataMessage();
+            }
+            
+            requestAnimationFrame(renderLoop);
+        }
+        
+        // Render frame to canvas
+        async function renderFrame(frameData) {
+            if (!ctx || !canvas) return;
+            
+            try {
+                // Frame bytes arrive as an ArrayBuffer. Image decoders expect
+                // an image source, so wrap the JPEG bytes in a Blob first.
+                const imageBlob = new Blob([frameData], { type: 'image/jpeg' });
+
+                // Use createImageBitmap for better performance
+                let bitmap;
+                if (typeof createImageBitmap !== 'undefined') {
+                    bitmap = await createImageBitmap(imageBlob);
+                } else {
+                    // Fallback to Image object
+                    const img = new Image();
+                    const imageUrl = URL.createObjectURL(imageBlob);
+                    img.src = imageUrl;
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                    URL.revokeObjectURL(imageUrl);
+                    bitmap = img;
+                }
+                
+                // Resize canvas to match frame
+                canvas.width = bitmap.width;
+                canvas.height = bitmap.height;
+                
+                // Draw frame
+                ctx.drawImage(bitmap, 0, 0);
+                
+                // Update resolution display
+                if (statResolution) {
+                    statResolution.textContent = `${bitmap.width}×${bitmap.height}`;
+                }
+                
+                // Hide no data message
+                hideNoDataMessage();
+                
+                // Cleanup
+                if (bitmap instanceof ImageBitmap) {
+                    bitmap.close();
+                }
+            } catch (e) {
+                console.error('Error rendering frame:', e);
+            }
+        }
+        
+        // Show no data message
+        function showNoDataMessage() {
+            const noDataMsg = document.getElementById('noDataMessage');
+            if (noDataMsg) {
+                noDataMsg.classList.remove('hidden');
+            }
+        }
+        
+        // Hide no data message
+        function hideNoDataMessage() {
+            const noDataMsg = document.getElementById('noDataMessage');
+            if (noDataMsg) {
+                noDataMsg.classList.add('hidden');
+            }
+        }
+        
+        // Update debug display
+        function updateDebugDisplay() {
+            const debugElement = document.getElementById('debugInfo');
+            if (debugElement) {
+                debugElement.innerHTML = `
+                    <div class="text-xs text-slate-400 space-y-1">
+                        <div>Incoming FPS: ${debugInfo.incomingFPS}</div>
+                        <div>Outgoing FPS: ${debugInfo.outgoingFPS}</div>
+                        <div>Resolution: ${debugInfo.resolution}</div>
+                        <div>Bytes/frame: ${debugInfo.bytesPerFrame}</div>
+                        <div>Dropped: ${debugInfo.droppedFrames}</div>
+                    </div>
+                `;
+            }
+            // Reset counters
+            debugInfo.incomingFPS = 0;
+            debugInfo.outgoingFPS = 0;
+        }
+        
+        // Load computers from API
+        async function loadComputers() {
+            try {
+                const response = await fetch('/api/computers', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                const data = await response.json();
+                
+                renderComputerList(data.computers);
+                updateStats(data);
+            } catch (error) {
+                console.error('Error loading computers:', error);
+            }
+        }
+        
+        // Render computer list
+        function renderComputerList(computers) {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filtered = computers.filter(c => 
+                c.computer_name.toLowerCase().includes(searchTerm) ||
+                c.mac_address.toLowerCase().includes(searchTerm)
+            );
+            
+            if (filtered.length === 0) {
+                computerList.innerHTML = `
+                    <div class="text-center text-slate-500 py-8">
+                        <p>No computers found</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            computerList.innerHTML = filtered.map(computer => `
+                <div 
+                    class="computer-card bg-slate-800 border-2 border-transparent rounded-lg p-3 cursor-pointer ${selectedComputerId === computer.id ? 'active' : ''} ${computer.online ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-slate-600'}"
+                    onclick="selectComputer(${computer.id}, '${computer.computer_name.replace(/'/g, "\\'")}', ${JSON.stringify(computer).replace(/"/g, '&quot;')})"
+                >
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium text-sm truncate">${computer.computer_name}</span>
+                        <span class="w-2 h-2 rounded-full ${computer.online ? 'bg-green-500 status-online' : 'bg-slate-500'}"></span>
+                    </div>
+                    <div class="text-xs text-slate-400 space-y-1">
+                        <div class="flex justify-between">
+                            <span>MAC:</span>
+                            <span class="font-mono">${computer.mac_address.substring(0, 8)}...</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>IP:</span>
+                            <span>${computer.ip_address || '-'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Last seen:</span>
+                            <span>${formatTime(computer.last_seen)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Select computer
+        function selectComputer(computerId, computerName, computer) {
+            selectedComputerId = computerId;
+            selectedComputer = computer;
+            selectedComputerName.textContent = computerName;
+            
+            // Show toolbar and stats
+            document.getElementById('toolbar').classList.remove('hidden');
+            document.getElementById('statsBar').classList.remove('hidden');
+            
+            // Show canvas, hide placeholder
+            screenPlaceholder.classList.add('hidden');
+            screenCanvas.classList.remove('hidden');
+            
+            // Check for recursive capture
+            checkRecursiveCapture(computer);
+            
+            // Subscribe to this computer
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    computer_id: computerId
+                }));
+            }
+            
+            // Load keyboard events
+            loadKeyboardEvents(computerId);
+            
+            // Update UI
+            loadComputers();
+        }
+        
+        // Check for recursive capture
+        function checkRecursiveCapture(computer) {
+            const currentHostname = window.location.hostname;
+            const currentIP = computer.ip_address;
+            
+            // Check if the computer being monitored is the same as the viewer
+            if (computer.computer_name === getLocalHostname() || 
+                currentIP === '127.0.0.1' || 
+                currentIP === '::1') {
+                isRecursiveCapture = true;
+                recursiveWarning.classList.remove('hidden');
+            } else {
+                isRecursiveCapture = false;
+                recursiveWarning.classList.add('hidden');
+            }
+        }
+        
+        // Get local hostname (best effort)
+        function getLocalHostname() {
+            // This is a simplified check - in production you'd need server-side detection
+            return window.location.hostname;
+        }
+        
+        // Connect WebSocket
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/dashboard`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                // Restore the active stream after an automatic reconnect.
+                if (selectedComputerId) {
+                    ws.send(JSON.stringify({
+                        type: 'subscribe',
+                        computer_id: selectedComputerId
+                    }));
+                }
+            };
+            
+            ws.onmessage = async (event) => {
+                if (event.data instanceof Blob) {
+                    // Binary frame with header: [computer_id (4)][width (4)][height (4)][timestamp (8)][frame_data]
+                    const arrayBuffer = await event.data.arrayBuffer();
+                    const dataView = new DataView(arrayBuffer);
+                    
+                    if (arrayBuffer.byteLength < 20) {
+                        console.error('Frame too short:', arrayBuffer.byteLength);
+                        return;
+                    }
+                    
+                    // Extract header
+                    const computerId = dataView.getUint32(0);
+                    const width = dataView.getUint32(4);
+                    const height = dataView.getUint32(8);
+                    const timestamp = dataView.getBigUint64(12);
+                    
+                    // Extract frame data (remaining bytes)
+                    const frameData = arrayBuffer.slice(20);
+                    
+                    // Update debug info
+                    debugInfo.incomingFPS++;
+                    debugInfo.imageSize = frameData.byteLength;
+                    debugInfo.resolution = `${width}x${height}`;
+                    debugInfo.bytesPerFrame = frameData.byteLength;
+                    debugInfo.lastFrameTime = Number(timestamp);
+                    lastFrameReceivedTime = Date.now();
+                    
+                    // Only process if it's for the selected computer
+                    if (computerId === selectedComputerId) {
+                        frameBuffer = frameData;
+                        debugInfo.outgoingFPS++;
+                    } else {
+                        debugInfo.droppedFrames++;
+                    }
+                } else {
+                    // JSON message
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                }
+            };
+            
+            ws.onclose = () => {
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = (error) => {
+                // WebSocket error
+            };
+        }
+        
+        // Handle WebSocket message
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'keyboard_event':
+                    addKeyboardEvent(data.computer_id, data.data);
+                    break;
+                case 'stats':
+                    updateStatsDisplay(data.data);
+                    break;
+                case 'computer_updated':
+                    loadComputers();
+                    break;
+            }
+        }
+        
+        // Update stats display
+        function updateStatsDisplay(stats) {
+            if (!stats) return;
+            
+            if (statResolution && stats.resolution) {
+                statResolution.textContent = stats.resolution;
+            }
+            if (statFPS && stats.fps) {
+                statFPS.textContent = stats.fps.toFixed(1);
+            }
+            if (statCPU && stats.cpu_percent !== undefined) {
+                statCPU.textContent = stats.cpu_percent.toFixed(1) + '%';
+            }
+            if (statMemory && stats.memory_percent !== undefined) {
+                statMemory.textContent = stats.memory_percent.toFixed(1) + '%';
+            }
+        }
+        
+        // Add keyboard event to display
+        function addKeyboardEvent(computerId, event) {
+            if (!selectedComputerId || computerId !== selectedComputerId) return;
+            
+            keyboardEvents.push(event);
+            if (keyboardEvents.length > 500) {
+                keyboardEvents.shift();
+            }
+            
+            renderKeyboardEvents();
+        }
+        
+        // Render keyboard events
+        function renderKeyboardEvents() {
+            const searchTerm = keyboardSearch.value.toLowerCase();
+            const windowFilterValue = windowFilter.value;
+            
+            const filtered = keyboardEvents.filter(e => {
+                const matchesSearch = e.key.toLowerCase().includes(searchTerm) ||
+                                     e.window.toLowerCase().includes(searchTerm);
+                const matchesWindow = !windowFilterValue || e.window === windowFilterValue;
+                return matchesSearch && matchesWindow;
+            });
+            
+            if (filtered.length === 0) {
+                keyboardEventsContainer.innerHTML = `
+                    <div class="text-center text-slate-500 py-4">
+                        No keyboard events
+                    </div>
+                `;
+                return;
+            }
+            
+            let typedText = '';
+            for (const event of filtered) {
+                if (event.key === '[BACKSPACE]') {
+                    typedText = typedText.slice(0, -1);
+                } else if (event.key === '[ENTER]') {
+                    typedText += '\n';
+                } else if (event.key === '[TAB]') {
+                    typedText += '\t';
+                } else if (!/^\[(SHIFT|CTRL|ALT|WIN|CAPS)\]$/.test(event.key)) {
+                    typedText += event.key;
+                }
+            }
+
+            keyboardEventsContainer.textContent = typedText || 'No typed input';
+            
+            // Keep the newest typed input in view.
+            keyboardEventsContainer.scrollTop = keyboardEventsContainer.scrollHeight;
+        }
+        
+        // Load keyboard events from API
+        async function loadKeyboardEvents(computerId) {
+            try {
+                const response = await fetch(`/api/computers/${computerId}/keyboard-events?limit=100`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                const data = await response.json();
+                
+                keyboardEvents = data.events.reverse();
+                renderKeyboardEvents();
+                
+                // Update window filter options
+                const windows = [...new Set(keyboardEvents.map(e => e.window))];
+                windowFilter.innerHTML = '<option value="">All Windows</option>' +
+                    windows.map(w => `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`).join('');
+                
+            } catch (error) {
+                console.error('Error loading keyboard events:', error);
+            }
+        }
+        
+        // Update stats display
+        function updateStatsDisplay(stats = null) {
+            // The render loop updates frame counters without a stats payload.
+            // Ignore that refresh until the client has supplied stats.
+            if (!stats || !stats.screen_capture) {
+                return;
+            }
+
+            if (stats.screen_capture) {
+                document.getElementById('statResolution').textContent = stats.screen_capture.resolution || '-';
+                document.getElementById('statFPS').textContent = stats.screen_capture.fps || '-';
+            }
+            
+            if (stats.screen_capture) {
+                document.getElementById('statCPU').textContent = 
+                    stats.screen_capture.cpu_percent ? `${stats.screen_capture.cpu_percent.toFixed(1)}%` : '-';
+            }
+            
+            // Memory would need to be sent from client
+            document.getElementById('statMemory').textContent = '-';
+        }
+        
+        // Update global stats
+        function updateStats(data) {
+            document.getElementById('totalComputers').textContent = data.count;
+            const onlineCount = data.computers.filter(c => c.online).length;
+            document.getElementById('onlineComputers').textContent = onlineCount;
+        }
+        
+        // Format time
+        function formatTime(timeStr) {
+            if (!timeStr) return '-';
+            const date = new Date(timeStr);
+            return date.toLocaleTimeString();
+        }
+        
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Event listeners
+        searchInput.addEventListener('input', () => loadComputers());
+        
+        keyboardSearch.addEventListener('input', renderKeyboardEvents);
+        windowFilter.addEventListener('change', renderKeyboardEvents);
+        
+        fullscreenBtn.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                screenContainer.requestFullscreen();
+            }
+        });
+        
+        pauseBtn.addEventListener('click', () => {
+            isPaused = true;
+            pauseBtn.classList.add('hidden');
+            resumeBtn.classList.remove('hidden');
+        });
+        
+        resumeBtn.addEventListener('click', () => {
+            isPaused = false;
+            resumeBtn.classList.add('hidden');
+            pauseBtn.classList.remove('hidden');
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            selectedComputerId = null;
+            selectedComputerName.textContent = 'Select a computer';
+            connectionStatus.classList.add('hidden');
+            statsBar.classList.add('hidden');
+            screenPlaceholder.classList.remove('hidden');
+            screenCanvas.classList.add('hidden');
+            keyboardEvents = [];
+            renderKeyboardEvents();
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    computer_id: null
+                }));
+            }
+        });
+        
+        copyAllBtn.addEventListener('click', () => {
+            const text = keyboardEvents.map(e => 
+                `${e.key} @ ${e.window} - ${e.time}`
+            ).join('\n');
+            
+            navigator.clipboard.writeText(text).then(() => {
+                copyAllBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyAllBtn.textContent = 'Copy All';
+                }, 2000);
+            });
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            keyboardEvents = [];
+            renderKeyboardEvents();
+        });
+        
+        // Start
+        init();
+    </script>
+</body>
+</html>
