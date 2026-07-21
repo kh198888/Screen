@@ -219,7 +219,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 def main():
     """Main entry point for the server."""
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=PORT,
         reload=False,  # Set to True for development
