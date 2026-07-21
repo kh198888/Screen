@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python -c \"import os,sys; from pathlib import Path; cwd=Path(os.getcwd()); candidates=[cwd] + [cwd / d for d in os.listdir(cwd) if (cwd / d).is_dir()]; root=None; \nfor p in candidates:\n    if (p / 'server' / 'main.py').exists():\n        root=p\n        break\nif root is None:\n    raise SystemExit('Could not locate server package')\nsys.path.insert(0, str(root)); from server.main import main; main()\"",
+    "startCommand": "python -c \"import os,sys; paths=[os.getcwd(),'/app','/workspace','/var/task','/usr/src/app','/opt','/home']; root=next((p for p in paths if p and os.path.exists(os.path.join(p,'server','main.py'))), None);\nif root is None: sys.exit('Could not locate server package');\nsys.path.insert(0, root); from server.main import main; main()\"",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
